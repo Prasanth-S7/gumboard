@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { DraggableRoot, DraggableContainer, DraggableItem } from "@/components/u
 import { cn } from "@/lib/utils";
 import { Trash2, Plus, Archive, ArchiveRestore } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useMemo } from "react";
 
 // Core domain types
 export interface User {
@@ -65,6 +66,7 @@ interface NoteProps {
   onDelete?: (noteId: string) => void;
   onArchive?: (noteId: string) => void;
   onUnarchive?: (noteId: string) => void;
+  onHeightMeasured?: (noteId: string, height: number) => void;
   readonly?: boolean;
   showBoardName?: boolean;
   className?: string;
@@ -79,6 +81,7 @@ export function Note({
   onDelete,
   onArchive,
   onUnarchive,
+  onHeightMeasured,
   readonly = false,
   showBoardName = false,
   className,
@@ -98,8 +101,44 @@ export function Note({
   );
   const [newItemContent, setNewItemContent] = useState("");
   const newItemInputRef = useRef<HTMLInputElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const canEdit = !readonly && (currentUser?.id === note.user.id || currentUser?.isAdmin);
+
+  const checklistItemsKey = useMemo(() => {
+    return note.checklistItems?.map(item => ({
+      id: item.id,
+      content: item.content,
+      checked: item.checked,
+      order: item.order
+    })) || [];
+  }, [note.checklistItems]);
+
+  // Custom hook for automatic height measurement
+  const useMeasureHeight = () => {
+    const measureHeight = useCallback(() => {
+      if (contentRef.current && onHeightMeasured) {
+        const height = contentRef.current.scrollHeight;
+        onHeightMeasured(note.id, height);
+      }
+    }, []);
+
+    useLayoutEffect(() => {
+      measureHeight();
+    }, [
+      note.checklistItems?.length,
+      note.content,
+      addingItem,
+      newItemContent,
+      editingItem,
+      editingItemContent,
+      isEditing,
+      editContent,
+      checklistItemsKey,
+    ]);
+  };
+
+  useMeasureHeight();
 
   useEffect(() => {
     if (addingChecklistItem === note.id && canEdit) {
@@ -545,7 +584,7 @@ export function Note({
           />
         </div>
       ) : (
-        <div className="flex flex-col">
+        <div className="flex flex-col" ref={contentRef}>
           <div className="overflow-y-auto space-y-1">
             {/* Checklist Items */}
             <DraggableRoot

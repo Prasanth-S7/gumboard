@@ -52,6 +52,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   });
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [addingChecklistItem, setAddingChecklistItem] = useState<string | null>(null);
+  const [measuredHeights, setMeasuredHeights] = useState<Map<string, number>>(new Map());
   // Per-item edit and animations are handled inside Note component now
   const [deleteNoteDialog, setDeleteNoteDialog] = useState<{
     open: boolean;
@@ -69,6 +70,14 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
   const boardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const handleOnHeightMeasured = (noteId: string, height: number) => {
+    setMeasuredHeights(prev => {
+      const newMap = new Map(prev);
+      newMap.set(noteId, height);
+      return newMap;
+    });
+  };
 
   // Update URL with current filter state
   const updateURL = (
@@ -195,6 +204,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
 
   // Helper function to calculate note height based on content
   const calculateNoteHeight = (note: Note, noteWidth?: number, notePadding?: number) => {
+    // Use measured height if available
+    const measuredHeight = measuredHeights.get(note.id);
+    if (measuredHeight) {
+      return measuredHeight + 80; // Add some padding for the note container
+    }
+
+    // Fallback to estimation for initial render
     const config = getResponsiveConfig();
     const actualNotePadding = notePadding || config.notePadding;
     const actualNoteWidth = noteWidth || config.noteWidth;
@@ -374,6 +390,13 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId]);
+
+  // trigger layout recalculation when measured heights change
+  useEffect(() => {
+    if (measuredHeights.size > 0) {
+      setNotes((prevNotes) => [...prevNotes]);
+    }
+  }, [measuredHeights]);
 
   // Close dropdowns when clicking outside and handle escape key
   useEffect(() => {
@@ -1074,6 +1097,7 @@ export default function BoardPage({ params }: { params: Promise<{ id: string }> 
               onDelete={handleDeleteNote}
               onArchive={boardId !== "archive" ? handleArchiveNote : undefined}
               onUnarchive={boardId === "archive" ? handleUnarchiveNote : undefined}
+              onHeightMeasured={handleOnHeightMeasured}
               showBoardName={boardId === "all-notes" || boardId === "archive"}
               className="note-background"
               style={{
