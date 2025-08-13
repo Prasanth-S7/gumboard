@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User } from "./note";
 
 type Props = {
-  user: User | null;
+  user?: User;
 };
 
 export function ProfileDropdown({ user }: Props) {
